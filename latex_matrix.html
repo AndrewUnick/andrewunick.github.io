@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+    <style>
+        h1 {
+            font: bold 18pt sans-serif;
+        }
+
+        h2 {
+            font: 16pt sans-serif;
+        }
+
+        ul {
+            font: 12pt sans-serif;
+        }
+
+        #the_table td {
+            width:2em;
+            height: 2em;
+            text-align: center;
+            vertical-align: middle;
+            margin: 0;
+            padding: 2px;
+        }
+
+        #toolbar {
+            background-color: #eee;
+        }
+        #toolbar tr {
+            padding: 0;
+            margin: 10px;
+        }
+        #toolbar td {
+            padding: 2px;
+            padding-left: 10px;
+            margin: 4px;
+            font: 12pt sans-serif;
+        }
+        #toolbar td.input {
+            padding-left: 2px;
+            width: 3em; 
+            background-color: white; 
+            text-align: center;
+        }
+        #toolbar select {
+            font: 12pt sans-serif;
+        }
+        #toolbar button {
+            font: 12pt sans-serif;}
+      </style>
+      </head>
+<body onload="onLoad();">
+
+<h1>LaTeX matrix generator</h1>
+
+
+<p>
+<table id="toolbar">
+    <tr>
+        <td>&nbsp;</td>
+        <td>Rows</td>
+        <td id="r" class="input" contenteditable="true">4</td>
+        <td>Columns</td>
+        <td id="c" class="input" contenteditable="true">7</td>
+        <td>Include I<sub>k</sub></td>
+        <td>
+            <select id="i">
+                <option>None</option>
+                <option>Leading</option>
+                <option>Trailing</option>
+            </select>
+        </td>
+        <td>Standard</td>
+        <td>
+            <select id="std">
+                <option>None</option>
+                <option>Ham(3,2) gen</option>
+                <option>Ham(3,2) parity</option>
+                <option>Ham(2,3) parity</option>
+            </select>
+        </td>
+        <td>
+            <button type="button" onclick="makeTable()">Table</button>
+        </td>
+        <td>
+            <button type="button" onclick="transpose()">Transpose</button>
+        </td>
+        <td>
+            <select id="bracket">
+                <option>[ square brackets ]</option>
+                <option>( parenthesis )</option>
+                <option>{ curly brackets }</option>
+                <option>| vertical lines |</option>
+                <option>|| double lines ||</option>
+                <option>no brackets</option>
+                <option>⊞ table</option>
+            </select>
+        </td>
+        <td>
+            <button type="button" onclick="latexIt()">Latex</button>
+        </td>
+        <td>&nbsp;</td>
+    </tr>
+</table>
+</p>
+<p>
+
+</p>
+
+<h2>Populate the table</h2>
+<p>
+<div id="table_container">
+<table id="the_table" contenteditable="true" border="1">
+<tr><td></td><td></td></tr>
+</table>
+</div>
+<br>
+</p>
+
+<h2>LaTeX</h2>
+<textarea id="latex" rows="10" cols="80"></textarea>
+<br>
+
+<script>
+
+function onLoad() {
+    makeTable();
+}
+
+function makeTable() {
+    t = document.getElementById('the_table')
+    r = parseInt(document.getElementById('r').innerText);
+    c = parseInt(document.getElementById('c').innerText);
+    i = document.getElementById('i').selectedIndex;
+    std = document.getElementById('std').selectedIndex;
+    
+    k = r > c ? c : r;
+    document.getElementById('latex').value = '';
+
+    t.innerHTML = '';
+    tbody = '';
+
+    if (std == 0) {
+        for (let tr = 0; tr < r; tr++) {
+            tbody += '<tr>';
+                for (let td = 0; td < c; td++) {
+                    tbody += '<td contenteditable="true">';
+                    if (i == 1) {
+                        if (td < k && tr < k) {
+                            if (td == tr) {
+                                tbody += '1';
+                            }
+                            else {
+                                tbody += '0';
+                            }
+                        }
+                    }
+                    if (i == 2) {
+                        if (c >= r) {
+                            if (td >= c - k) {
+                                if (td == c - k + tr) {
+                                    tbody += '1';
+                                }
+                                else {
+                                    tbody += '0';
+                                }
+                            }
+                        }
+                        else {
+                            if (tr >= r - k) {
+                                if (tr == r - k + td) {
+                                    tbody += '1';
+                                }
+                                else {
+                                    tbody += '0';
+                                }
+                            }
+                        }
+                    }
+                    tbody += '</td>';
+                }
+            tbody += '</tr>';
+        }
+    }
+    else {
+        switch(std) {
+            case 1: 
+                tbody = '<tr><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td></tr>' +
+                        '<tr><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td></tr>' +
+                        '<tr><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td><td>1</td><td>0</td></tr>' +
+                        '<tr><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>'; 
+                break;
+            case 2: 
+                tbody = '<tr><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>' +
+                        '<tr><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td></tr>' +
+                        '<tr><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td></tr>'; 
+                break;
+            case 3: 
+                tbody = '<tr><td>0</td><td>1</td><td>1</td><td>1</td></tr>' + 
+                        '<tr><td>1</td><td>0</td><td>1</td><td>2</td></tr>';
+                break;
+        }
+    }
+    t.innerHTML = tbody;
+}
+
+function latexIt() {
+    
+    t = document.getElementById('the_table');
+
+    switch(document.getElementById('bracket').selectedIndex) {
+        case 0: b = 'bmatrix'; break;
+        case 1: b = 'pmatrix'; break;
+        case 2: b = 'Bmatrix'; break;
+        case 3: b = 'vmatrix'; break;
+        case 4: b = 'Vmatrix'; break;
+        case 5: b = 'matrix'; break;
+        case 6: b = 'tabular';
+    }
+
+    l = '\\begin{' + b + '}';
+    if (b == 'tabular') { l += '{' + "c".repeat(parseInt(document.getElementById('c').innerText)) + '}' }
+    l += '\n';
+
+    for (var tr = 0, row; row = t.rows[tr]; tr++) {
+        l += '  ';
+        for (var td = 0, col; col = row.cells[td]; td++) {
+            l += col.innerText + ' & ';
+        }
+        l = l.slice(0,-2);
+        l += '\\\\ \n';
+    }
+    l = l.slice(0,-4);
+    l += ' \n'
+
+    l += '\\end{' + b + '}\n';
+
+    document.getElementById('latex').value = l;
+}
+
+function transpose() {
+    t = document.getElementById('the_table');
+    r = t.rows.length;
+    c = t.rows[0].cells.length;
+    
+    document.getElementById('latex').value = '';
+
+    tbody = '';
+    for (let td = 0; td < c; td++) {
+        tbody += '<tr>';
+        for (let tr = 0; tr < r; tr++) {
+            tbody += '<td contenteditable="true">' + t.rows[tr].cells[td].innerText + '</td>';
+        }
+        tbody += '</tr>';
+    }
+
+    t.innerHTML = tbody;
+}
+</script>
+
+<h2>How to</h2>
+<p>
+    <ul>
+        <li>On the toolbar, enter the number of rows and columns and click <strong>Table</strong></li>
+
+        <li>If you want to include the identity matrix, select from <strong>Include I<sub>k</sub></strong> before clicking <strong>Table</strong>.</li>
+
+        <li>Selecting from <strong>Standard</strong> will ignore dimension and identity selections</li>
+
+        <li>Populate the remaining cells directly on the table.</li>
+
+        <li>Click <strong>Table</strong> will clear any previous entries or Latex</li>
+
+        <li>Clicking <strong>Transpose</strong> will transform the current table, preserving all entries. Latex will be cleared.</li>
+
+        <li>To generate the Latex, select the type of brackets and click <strong>Latex</strong>. Copy from the text box and paste in your tex.</li>
+    </ul>
+    <br>
+</p>
+
+<p>© 2023 Andrew Unick. This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0 License</a>.</p>
+
+</body>
+</html>
