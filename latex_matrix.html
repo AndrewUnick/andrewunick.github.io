@@ -24,29 +24,26 @@
 
         #toolbar {
             background-color: #eee;
+            padding: 8px;
         }
-        #toolbar tr {
-            padding: 0;
-            margin: 10px;
-        }
-        #toolbar td {
-            padding: 2px;
-            padding-left: 10px;
-            margin: 4px;
+        #toolbar * {
             font: 12pt sans-serif;
         }
+        #toolbar td {
+            padding: 2px 10px;
+        }
         #toolbar td.input {
-            padding-left: 2px;
+            border: solid 1px grey;
             width: 3em; 
             background-color: white; 
             text-align: center;
         }
-        #toolbar select {
-            font: 12pt sans-serif;
+        button {
+            padding: 4px 8px;
         }
-        #toolbar button {
-            font: 12pt sans-serif;}
       </style>
+      <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       </head>
 <body onload="onLoad();">
 
@@ -69,20 +66,21 @@
                 <option>Trailing</option>
             </select>
         </td>
-        <td>Standard</td>
+        <td>Presets</td>
         <td>
-            <select id="std">
+            <select id="p">
                 <option>None</option>
                 <option>Ham(3,2) gen</option>
                 <option>Ham(3,2) parity</option>
+                <option>Hâm(3,2) Ext parity</option>
                 <option>Ham(2,3) parity</option>
             </select>
         </td>
         <td>
-            <button type="button" onclick="makeTable()">Table</button>
+            <button type="button" onclick="makeTable()"><img src="i/table-cell-select-all-svgrepo-com.svg" width="30px" alt="Make table"></button>
         </td>
         <td>
-            <button type="button" onclick="transpose()">Transpose</button>
+            <button type="button" onclick="transpose()"><img src="i/transpose-svgrepo-com.svg" width="30px" alt="Transpose"></button>
         </td>
         <td>
             <select id="bracket">
@@ -96,7 +94,7 @@
             </select>
         </td>
         <td>
-            <button type="button" onclick="latexIt()">Latex</button>
+            <button type="button" onclick="latexIt()"><img src="i/latex-svgrepo-com.svg" width="30px" alt="LaTeX"></button>
         </td>
         <td>&nbsp;</td>
     </tr>
@@ -116,9 +114,22 @@
 <br>
 </p>
 
-<h2>LaTeX</h2>
-<textarea id="latex" rows="10" cols="80"></textarea>
-<br>
+
+<table>
+    <tr>
+        <td><h2>LaTeX</h2></td>
+        <td><h2>Output</h2></td>
+    </tr>
+    <tr>
+        <td>
+            <textarea id="latex" rows="10" cols="60" style="margin-right:100px;"></textarea>
+        </td>
+        <td>
+            <span id="output"></span>
+        </td>
+    </tr>
+</table>
+
 
 <script>
 
@@ -131,7 +142,7 @@ function makeTable() {
     r = parseInt(document.getElementById('r').innerText);
     c = parseInt(document.getElementById('c').innerText);
     i = document.getElementById('i').selectedIndex;
-    std = document.getElementById('std').selectedIndex;
+    p = document.getElementById('p').selectedIndex;
     
     k = r > c ? c : r;
     document.getElementById('latex').value = '';
@@ -139,7 +150,7 @@ function makeTable() {
     t.innerHTML = '';
     tbody = '';
 
-    if (std == 0) {
+    if (p == 0) {
         for (let tr = 0; tr < r; tr++) {
             tbody += '<tr>';
                 for (let td = 0; td < c; td++) {
@@ -182,7 +193,7 @@ function makeTable() {
         }
     }
     else {
-        switch(std) {
+        switch(p) {
             case 1: 
                 tbody = '<tr><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td></tr>' +
                         '<tr><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td></tr>' +
@@ -195,12 +206,19 @@ function makeTable() {
                         '<tr><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td></tr>'; 
                 break;
             case 3: 
+                tbody = '<tr><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td><td>1</td><td>1</td><td>0</td></tr>' +
+                        '<tr><td>0</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>0</td></tr>' +
+                        '<tr><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td></tr>' +
+                        '<tr><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>'; 
+                break;
+            case 4: 
                 tbody = '<tr><td>0</td><td>1</td><td>1</td><td>1</td></tr>' + 
                         '<tr><td>1</td><td>0</td><td>1</td><td>2</td></tr>';
                 break;
         }
     }
     t.innerHTML = tbody;
+    latexIt();
 }
 
 function latexIt() {
@@ -235,14 +253,13 @@ function latexIt() {
     l += '\\end{' + b + '}\n';
 
     document.getElementById('latex').value = l;
+    renderLatex();
 }
 
 function transpose() {
     t = document.getElementById('the_table');
     r = t.rows.length;
     c = t.rows[0].cells.length;
-    
-    document.getElementById('latex').value = '';
 
     tbody = '';
     for (let td = 0; td < c; td++) {
@@ -254,6 +271,12 @@ function transpose() {
     }
 
     t.innerHTML = tbody;
+    latexIt();
+}
+
+function renderLatex() {
+    document.getElementById('output').innerText = "\\[" + document.getElementById('latex').value + "\\]";
+    MathJax.typeset();
 }
 </script>
 
@@ -264,20 +287,22 @@ function transpose() {
 
         <li>If you want to include the identity matrix, select from <strong>Include I<sub>k</sub></strong> before clicking <strong>Table</strong>.</li>
 
-        <li>Selecting from <strong>Standard</strong> will ignore dimension and identity selections</li>
+        <li>Selecting from <strong>Presets</strong> will ignore dimension and identity selections</li>
 
         <li>Populate the remaining cells directly on the table.</li>
 
-        <li>Click <strong>Table</strong> will clear any previous entries or Latex</li>
-
         <li>Clicking <strong>Transpose</strong> will transform the current table, preserving all entries. Latex will be cleared.</li>
 
-        <li>To generate the Latex, select the type of brackets and click <strong>Latex</strong>. Copy from the text box and paste in your tex.</li>
+        <li>Any action will rewrite LaTeX and refresh Output.</li>
+
+        <li>Clicking <strong>LaTeX</strong> will refresh the Latex and output, reflecting changes to the table and bracket selection. Copy from the text box and paste in your tex.</li>
     </ul>
     <br>
 </p>
 
-<p>© 2023 Andrew Unick. This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0 License</a>.</p>
+<p>
+    2023 Andrew Unick. Icons by <a href="https://www.svgrepo.com" target="_blank">SVG Repo</a>. Output powered by <a href="https://www.mathjax.org">MathJax</a>.
+</p>
 
 </body>
 </html>
