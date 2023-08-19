@@ -85,7 +85,7 @@
             </select>
         </td>
         <td>
-            <button type="button" onclick="makeTable()"><img src="i/table-cell-select-all-svgrepo-com.svg" width="30px" alt="Make table"></button>
+            <button type="button" onclick="makeTable()" title="Generate table"><img src="i/table-cell-select-all-svgrepo-com.svg" width="30px"></button>
         </td>
         <td>
             <select id="bracket">
@@ -99,7 +99,7 @@
             </select>
         </td>
         <td>
-            <button type="button" onclick="latexIt()"><img src="i/latex-svgrepo-com.svg" width="30px" alt="LaTeX"></button>
+            <button type="button" onclick="latexIt()" title="Refresh LaTeX"><img src="i/latex-svgrepo-com.svg" width="30px"></button>
         </td>
         <td>&nbsp;</td>
     </tr>
@@ -108,13 +108,13 @@
         <td>Swap</td>
         <td id="x1" class="input" contenteditable="true"></td>
         <td>
-            <button type="button" onclick="swapRows()"><img src="i/swapRows.svg" width="30px" alt="Swap rows"></button>
-            <button type="button" onclick="swapColumns()"><img src="i/swapCols.svg" width="30px" alt="Swap columns"></button>
+            <button type="button" onclick="swapRows()" title="Swap rows"><img src="i/swapRows.svg" width="30px"></button>
+            <button type="button" onclick="swapColumns()" alt="Swap columns"><img src="i/swapCols.svg" width="30px"></button>
         </td>
         <td id="x2" class="input" contenteditable="true"></td>
         <td></td>
         <td>
-            <button type="button" onclick="transpose()"><img src="i/transpose-svgrepo-com.svg" width="30px" alt="Transpose"></button>
+            <button type="button" onclick="transpose()" title="Transpose"><img src="i/transpose-svgrepo-com.svg" width="30px"></button>
         </td>
     </tr>
 </table>
