@@ -38,12 +38,19 @@
             background-color: white; 
             text-align: center;
         }
+        select {
+            font: 12pt sans-serif;
+        }
         button {
             padding: 4px 8px;
+        }
+        textarea {
+            font: 12pt monospace;
         }
       </style>
       <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
       <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <title>Matrix Generator</title>
       </head>
 <body onload="onLoad();">
 
@@ -58,7 +65,7 @@
         <td id="r" class="input" contenteditable="true">4</td>
         <td>Columns</td>
         <td id="c" class="input" contenteditable="true">7</td>
-        <td>Include I<sub>k</sub></td>
+        <td>Include <span style="font-family: serif; font-style: italic;">I</span><sub style="font-family: serif; font-style: italic;">k</sub></span></td>
         <td>
             <select id="i">
                 <option>None</option>
