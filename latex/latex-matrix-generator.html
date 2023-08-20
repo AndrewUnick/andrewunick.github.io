@@ -112,7 +112,8 @@
             <button type="button" onclick="swapColumns()" title="Swap columns"><img src="i/swapCols.svg" width="30px"></button>
         </td>
         <td id="x2" class="input" contenteditable="true"></td>
-        <td></td>
+        <td>
+        </td>
         <td>
             <button type="button" onclick="transpose()" title="Transpose"><img src="i/transpose-svgrepo-com.svg" width="30px"></button>
         </td>
@@ -149,6 +150,8 @@
     </tr>
 </table>
 
+<h2>JSON</h2>
+<textarea id="json" rows="4" cols="60"></textarea>
 
 <script>
 
@@ -283,23 +286,32 @@ function latexIt() {
     }
 
     l = '\\begin{' + b + '}';
+    j = '\[';
+
     if (b == 'tabular') { l += '{' + "c".repeat(parseInt(document.getElementById('c').innerText)) + '}' }
     l += '\n';
 
     for (var tr = 0, row; row = t.rows[tr]; tr++) {
         l += '  ';
+        j += ' \[';
         for (var td = 0, col; col = row.cells[td]; td++) {
             l += col.innerText + ' & ';
+            j += col.innerText + ', ';
         }
         l = l.slice(0,-2);
         l += '\\\\ \n';
+        j = j.slice(0, -2);
+        j += '\], '
     }
     l = l.slice(0,-4);
-    l += ' \n'
+    l += ' \n';
+    j = j.slice(0, -2);
+    j += ' ]';
 
     l += '\\end{' + b + '}\n';
 
     document.getElementById('latex').value = l;
+    document.getElementById('json').value = j;
     renderLatex();
 }
 
@@ -345,6 +357,8 @@ function renderLatex() {
         <li>Any action will rewrite LaTeX and refresh Output.</li>
 
         <li>Clicking <strong>LaTeX</strong> will refresh the Latex and output, reflecting changes to the table and bracket selection. Copy from the text box and paste in your tex.</li>
+
+        <li>A JSON array of array is also generated. All entries are assumed to be numeric.</li>
     </ul>
     <br>
 </p>
