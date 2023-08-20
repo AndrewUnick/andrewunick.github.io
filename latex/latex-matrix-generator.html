@@ -150,8 +150,8 @@
     </tr>
 </table>
 
-<h2>JSON</h2>
-<textarea id="json" rows="4" cols="60"></textarea>
+<h2>Other formats</h2>
+<textarea id="json" rows="8" cols="60"></textarea>
 
 <script>
 
@@ -286,32 +286,34 @@ function latexIt() {
     }
 
     l = '\\begin{' + b + '}';
-    j = '\[';
+    json = '';
+    sage = '';
 
     if (b == 'tabular') { l += '{' + "c".repeat(parseInt(document.getElementById('c').innerText)) + '}' }
     l += '\n';
 
     for (var tr = 0, row; row = t.rows[tr]; tr++) {
         l += '  ';
-        j += ' \[';
+        json += ' \[';
         for (var td = 0, col; col = row.cells[td]; td++) {
             l += col.innerText + ' & ';
-            j += col.innerText + ', ';
+            json += col.innerText + ', ';
         }
         l = l.slice(0,-2);
         l += '\\\\ \n';
-        j = j.slice(0, -2);
-        j += '\], '
+        json = json.slice(0, -2);
+        json += '\], '
     }
     l = l.slice(0,-4);
     l += ' \n';
-    j = j.slice(0, -2);
-    j += ' ]';
+    json = json.slice(0, -2);
+    sage = '\[' + json.replaceAll('[','(').replaceAll(']',')') + ' \]';
+    json = '\[' + json + ' \]';
 
     l += '\\end{' + b + '}\n';
 
     document.getElementById('latex').value = l;
-    document.getElementById('json').value = j;
+    document.getElementById('json').value = 'JSON:\n' + json + '\n\nSage:\n' + sage;
     renderLatex();
 }
 
