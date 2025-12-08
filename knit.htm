@@ -2,76 +2,154 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Dynamic Numbered Grid with Save & Row Selection</title>
+  <title>KNIT Pattern Grid</title>
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       margin: 20px;
+      max-width: 900px;
     }
 
     .controls {
-      margin-bottom: 16px;
+      margin-bottom: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
     }
 
     label {
-      margin-right: 8px;
+      margin-right: 4px;
     }
 
     input[type="number"] {
-      width: 80px;
-      margin-right: 12px;
+      width: 70px;
     }
 
     button {
-      padding: 6px 12px;
+      padding: 4px 10px;
       cursor: pointer;
+      margin-right: 4px;
+      margin-top: 4px;
+    }
+
+    #lockToggle.locked {
+      background-color: #eee;
+      border: 1px solid #999;
     }
 
     table {
       border-collapse: collapse;
-      margin-top: 16px;
+      margin-top: 12px;
     }
 
     td {
-      min-width: 30px;
-      height: 24px;
+      min-width: 22px;
+      height: 22px;
       text-align: center;
-      border: 1px solid #ddd; /* faint border */
-      font-size: 12px;
+      border: 1px solid #ddd;
+      font-size: 11px;
       background-color: white;
-      transition: background-color 0.2s ease, opacity 0.2s ease;
+      transition: background-color 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
       cursor: pointer;
+      user-select: none;
     }
 
-    /* Header cells */
     .header-cell {
       background-color: #f9f9f9;
       font-weight: 500;
     }
 
-    /* Active (coloured) cells */
-    .active-cell {
-      background-color: red !important;
+    /* Rows below selected (light dim) */
+    tr.row-dim-below td {
+      opacity: 0.45;
     }
 
-    /* Greyed rows (all non-selected data rows) */
-    tr.row-dim td {
-      opacity: 0.3;
+    /* Rows above selected (dark dim) */
+    tr.row-dim-above td {
+      opacity: 1;
+      filter: brightness(0.25);
     }
 
-    /* Bolder borders every 10 rows/columns */
-    .bold-top {
-      border-top-width: 2px !important;
-      border-top-color: #555 !important;
+    /* Column dimming */
+    td.col-dim {
+      opacity: 0.4;
     }
 
     .bold-right {
       border-right-width: 2px !important;
       border-right-color: #555 !important;
     }
+
+    .bold-bottom {
+      border-bottom-width: 2px !important;
+      border-bottom-color: #555 !important;
+    }
+
+    .notes-container {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    #patternNotes {
+      width: 100%;
+      min-height: 70px;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 4px;
+      box-sizing: border-box;
+    }
+
+    .palette-wrapper {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .palette-label {
+      font-size: 12px;
+      margin-right: 4px;
+    }
+
+    .palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .palette-swatch {
+      width: 18px;
+      height: 18px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      cursor: pointer;
+    }
+
+    .palette-swatch.selected {
+      outline: 2px solid #000;
+      outline-offset: 1px;
+    }
+
+    .io-buttons {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .small-label {
+      font-size: 11px;
+      color: #555;
+    }
   </style>
 </head>
 <body>
+  <h2>KNIT Pattern Grid</h2>
+
   <div class="controls">
     <label for="widthInput">Width:</label>
     <input type="number" id="widthInput" min="1" value="20" />
@@ -80,41 +158,91 @@
     <input type="number" id="heightInput" min="1" value="20" />
 
     <button type="button" onclick="generateTable()">Generate Table</button>
+    <button type="button" onclick="clearColours()">Clear pattern</button>
+    <button type="button" onclick="clearSelection()">Clear ruler</button>
+    <button type="button" id="lockToggle" onclick="toggleLock()">Lock Editing</button>
+  </div>
+
+  <div class="palette-wrapper">
+    <span class="palette-label">Colour:</span>
+    <div class="palette" id="palette"></div>
+    <span class="small-label">(click swatch, then click or drag over cells)</span>
+  </div>
+
+  <div class="notes-container">
+    <label for="patternNotes">Pattern notes / details:</label>
+    <textarea id="patternNotes" placeholder="Yarn, gauge, repeats, notes..."></textarea>
+  </div>
+
+  <div class="io-buttons">
+    <button type="button" onclick="downloadPattern()">Download Pattern (JSON)</button>
+    <button type="button" onclick="document.getElementById('uploadInput').click()">Upload Pattern (JSON)</button>
+    <input type="file" id="uploadInput" accept="application/json" style="display:none" onchange="handleUpload(this.files)" />
   </div>
 
   <div id="tableContainer"></div>
 
   <script>
-    const STORAGE_KEY = 'gridDesignV2';
+    const STORAGE_KEY = 'gridDesignV5';
+
+    const PALETTE = [
+      '#ffffff', '#000000', '#ff0000', '#00ff00',
+      '#0000ff', '#ffff00', '#ff00ff', '#00ffff',
+      '#ffa500', '#800080', '#ffc0cb', '#a52a2a',
+      '#808080', '#00ced1', '#8a2be2', '#006400'
+    ];
 
     let currentWidth = null;
     let currentHeight = null;
-    // rowNumber counted from bottom: 1 at bottom data row, height at top data row
-    let currentSelectedRowNumber = null;
+    let currentSelectedRowNumber = null; // bottom-based
+    let currentSelectedColNumber = null; // right-based
+    let isLocked = false;
+    let currentColor = '#000000';
 
-    function saveDesign(width, height) {
+    let isDragging = false;
+    let dragMode = null; // 'paint' or 'erase'
+    let lastDragCellKey = null;
+
+    function applyColorToCell(td, color) {
+      td.dataset.color = color;
+      if (!color || color === '#ffffff' || color.toLowerCase() === 'white') {
+        td.style.backgroundColor = 'white';
+      } else {
+        td.style.backgroundColor = color;
+      }
+    }
+
+    function buildDesignObject(width, height) {
       const table = document.querySelector('#tableContainer table');
-      if (!table) return;
-
-      const activeCells = [];
-      const dataCells = table.querySelectorAll('td[data-type="data"]');
-
-      dataCells.forEach(td => {
-        if (td.classList.contains('active-cell')) {
-          activeCells.push({
-            r: parseInt(td.dataset.row, 10),
-            c: parseInt(td.dataset.col, 10)
-          });
-        }
-      });
-
-      const design = {
+      let coloredCells = [];
+      if (table) {
+        const dataCells = table.querySelectorAll('td[data-type="data"]');
+        dataCells.forEach(td => {
+          const color = td.dataset.color || '#ffffff';
+          if (color && color !== '#ffffff' && color.toLowerCase() !== 'white') {
+            coloredCells.push({
+              r: parseInt(td.dataset.row, 10),
+              c: parseInt(td.dataset.col, 10),
+              color: color
+            });
+          }
+        });
+      }
+      const notes = document.getElementById('patternNotes').value || '';
+      return {
         width,
         height,
-        activeCells,
-        selectedRowNumber: currentSelectedRowNumber
+        coloredCells,
+        selectedRowNumber: currentSelectedRowNumber,
+        selectedColNumber: currentSelectedColNumber,
+        isLocked,
+        notes,
+        currentColor
       };
+    }
 
+    function saveDesign(width, height) {
+      const design = buildDesignObject(width, height);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(design));
     }
 
@@ -125,27 +253,41 @@
       if (!table) return;
 
       const rows = table.querySelectorAll('tr');
-      const totalRows = height + 2;
+      rows.forEach(tr => {
+        tr.classList.remove('row-dim-below', 'row-dim-above');
+      });
 
-      // Clear dimming from all rows first
-      rows.forEach(tr => tr.classList.remove('row-dim'));
+      if (!rowNumber) return;
 
-      if (!rowNumber) {
-        // No row selected → everything normal
-        return;
-      }
-
-      // Convert bottom-based rowNumber to DOM row index r (1..height)
-      const selectedRowIndex = height - rowNumber + 1;
-
-      // Apply dimming to all data rows except selected
       for (let r = 1; r <= height; r++) {
         const tr = rows[r];
         if (!tr) continue;
-        if (r !== selectedRowIndex) {
-          tr.classList.add('row-dim');
-        }
+        const rowNum = height - r + 1; // bottom-based
+        if (rowNum === rowNumber) continue;
+        else if (rowNum < rowNumber) tr.classList.add('row-dim-below');
+        else tr.classList.add('row-dim-above');
       }
+    }
+
+    function applyColumnSelectionByColNumber(colNumber, width, height) {
+      currentSelectedColNumber = colNumber;
+
+      const table = document.querySelector('#tableContainer table');
+      if (!table) return;
+
+      const dataCells = table.querySelectorAll('td[data-type="data"]');
+      dataCells.forEach(td => td.classList.remove('col-dim'));
+
+      if (!colNumber) return;
+
+      const selectedColIndex = width - colNumber + 1;
+
+      dataCells.forEach(td => {
+        const c = parseInt(td.dataset.col, 10);
+        if (c !== selectedColIndex) {
+          td.classList.add('col-dim');
+        }
+      });
     }
 
     function loadDesign(width, height) {
@@ -159,27 +301,48 @@
         return;
       }
 
-      if (!design || design.width !== width || design.height !== height) {
-        return;
-      }
+      if (!design || design.width !== width || design.height !== height) return;
 
       const table = document.querySelector('#tableContainer table');
       if (!table) return;
 
-      // Restore coloured cells
-      design.activeCells.forEach(pos => {
-        const selector =
-          `td[data-type="data"][data-row="${pos.r}"][data-col="${pos.c}"]`;
-        const cell = table.querySelector(selector);
-        if (cell) {
-          cell.classList.add('active-cell');
-        }
-      });
+      if (typeof design.notes === 'string') {
+        document.getElementById('patternNotes').value = design.notes;
+      }
 
-      // Restore selected row (if any)
+      if (typeof design.isLocked === 'boolean') {
+        isLocked = design.isLocked;
+      }
+
+      if (typeof design.currentColor === 'string') {
+        currentColor = design.currentColor;
+      }
+
+      if (Array.isArray(design.coloredCells)) {
+        design.coloredCells.forEach(pos => {
+          const selector =
+            `td[data-type="data"][data-row="${pos.r}"][data-col="${pos.c}"]`;
+          const cell = table.querySelector(selector);
+          if (cell) applyColorToCell(cell, pos.color);
+        });
+      } else if (Array.isArray(design.activeCells)) {
+        design.activeCells.forEach(pos => {
+          const selector =
+            `td[data-type="data"][data-row="${pos.r}"][data-col="${pos.c}"]`;
+          const cell = table.querySelector(selector);
+          if (cell) applyColorToCell(cell, '#ff0000');
+        });
+      }
+
       if (typeof design.selectedRowNumber === 'number') {
         applyRowSelectionByRowNumber(design.selectedRowNumber, height);
       }
+      if (typeof design.selectedColNumber === 'number') {
+        applyColumnSelectionByColNumber(design.selectedColNumber, width, height);
+      }
+
+      updateLockUI();
+      updatePaletteSelection(currentColor);
     }
 
     function generateTable() {
@@ -193,15 +356,16 @@
 
       currentWidth = width;
       currentHeight = height;
-      currentSelectedRowNumber = null; // reset; may be restored by loadDesign
+      currentSelectedRowNumber = null;
+      currentSelectedColNumber = null;
 
       const tableContainer = document.getElementById('tableContainer');
       tableContainer.innerHTML = '';
 
       const table = document.createElement('table');
 
-      const totalRows = height + 2; // extra top & bottom
-      const totalCols = width + 2;  // extra left & right
+      const totalRows = height + 2;
+      const totalCols = width + 2;
 
       for (let r = 0; r < totalRows; r++) {
         const tr = document.createElement('tr');
@@ -221,66 +385,82 @@
           let rowNumber = null;
           let colNumber = null;
 
-          if (inDataRowRange) {
-            // bottom row has rowNumber = 1
-            rowNumber = height - r + 1;
-          }
+          if (inDataRowRange) rowNumber = height - r + 1;
+          if (inDataColRange) colNumber = width - c + 1;
 
-          if (inDataColRange) {
-            // rightmost col has colNumber = 1
-            colNumber = width - c + 1;
-          }
-
-          // Header cells: top/bottom rows showing column numbers
           if ((isTopHeaderRow || isBottomHeaderRow) && inDataColRange) {
             td.textContent = width - c + 1;
             td.classList.add('header-cell');
-            td.dataset.type = 'header';
-          }
-
-          // Header cells: left/right columns showing row numbers
-          if ((isLeftHeaderCol || isRightHeaderCol) && inDataRowRange) {
-            td.textContent = height - r + 1;
-            td.classList.add('header-cell');
-            td.dataset.type = 'header';
-
-            // Click on row number selects that row
+            td.dataset.type = 'header-col';
             td.style.cursor = 'pointer';
+
             td.addEventListener('click', () => {
-              const rowNum = height - r + 1; // bottom-based
-              applyRowSelectionByRowNumber(rowNum, height);
-              saveDesign(width, height);
+              const colNum = width - c + 1;
+              if (currentSelectedColNumber === colNum) {
+                applyColumnSelectionByColNumber(null, width, height);
+              } else {
+                applyColumnSelectionByColNumber(colNum, width, height);
+              }
+              saveDesign(currentWidth, currentHeight);
             });
           }
 
-          // Corner cells: blank
+          if ((isLeftHeaderCol || isRightHeaderCol) && inDataRowRange) {
+            td.textContent = height - r + 1;
+            td.classList.add('header-cell');
+            td.dataset.type = 'header-row';
+            td.style.cursor = 'pointer';
+
+            td.addEventListener('click', () => {
+              const rowNum = height - r + 1;
+              if (currentSelectedRowNumber === rowNum) {
+                applyRowSelectionByRowNumber(null, height);
+              } else {
+                applyRowSelectionByRowNumber(rowNum, height);
+              }
+              saveDesign(currentWidth, currentHeight);
+            });
+          }
+
           if ((isTopHeaderRow || isBottomHeaderRow) &&
               (isLeftHeaderCol || isRightHeaderCol)) {
             td.textContent = '';
             td.classList.add('header-cell');
-            td.dataset.type = 'header';
+            td.dataset.type = 'corner';
+            td.style.cursor = 'default';
           }
 
-          // Mark data cells and set dataset row/col for saving
           if (inDataRowRange && inDataColRange) {
             td.dataset.type = 'data';
-            td.dataset.row = r.toString();  // DOM row index
-            td.dataset.col = c.toString();  // DOM col index
+            td.dataset.row = r.toString();
+            td.dataset.col = c.toString();
+            td.dataset.color = '#ffffff';
+            td.style.backgroundColor = 'white';
 
-            // Click handler to toggle colour + save design
-            td.addEventListener('click', () => {
-              td.classList.toggle('active-cell');
-              saveDesign(width, height);
+            td.addEventListener('mousedown', (e) => {
+              if (e.button !== 0) return;
+              e.preventDefault();
+              startDragOnCell(td);
             });
+
+            td.addEventListener('mouseenter', () => {
+              applyDragToCell(td);
+            });
+
+            td.addEventListener('touchstart', (e) => {
+              e.preventDefault();
+              startDragOnCell(td);
+            }, { passive: false });
           }
 
-          // Bold borders every 10 rows/cols from bottom-right
-          if (inDataRowRange && rowNumber !== null && rowNumber % 10 === 0) {
-            td.classList.add('bold-top');
-          }
-
-          if (inDataColRange && colNumber !== null && colNumber % 10 === 0) {
+          if (inDataColRange && colNumber !== null &&
+              (colNumber === 1 || (colNumber > 1 && (colNumber - 1) % 10 === 0))) {
             td.classList.add('bold-right');
+          }
+
+          if (inDataRowRange && rowNumber !== null &&
+              (rowNumber === 1 || (rowNumber > 1 && (rowNumber - 1) % 10 === 0))) {
+            td.classList.add('bold-bottom');
           }
 
           tr.appendChild(td);
@@ -291,12 +471,167 @@
 
       tableContainer.appendChild(table);
 
-      // After creating the table, try to restore any saved design
       loadDesign(width, height);
     }
 
-    // On page load, restore last width/height and design if available
+    function startDragOnCell(td) {
+      if (isLocked || td.dataset.type !== 'data') return;
+      isDragging = true;
+      lastDragCellKey = null;
+
+      const current = td.dataset.color || '#ffffff';
+      dragMode = (current === '#ffffff' || current.toLowerCase() === 'white')
+        ? 'paint'
+        : 'erase';
+
+      applyDragToCell(td);
+    }
+
+    function applyDragToCell(td) {
+      if (!isDragging || isLocked || !td || td.dataset.type !== 'data') return;
+      const key = td.dataset.row + ':' + td.dataset.col;
+      if (key === lastDragCellKey) return;
+      lastDragCellKey = key;
+
+      if (dragMode === 'paint') {
+        applyColorToCell(td, currentColor);
+      } else if (dragMode === 'erase') {
+        applyColorToCell(td, '#ffffff');
+      }
+    }
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      dragMode = null;
+      lastDragCellKey = null;
+      if (currentWidth && currentHeight) {
+        saveDesign(currentWidth, currentHeight);
+      }
+    }
+
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('mouseleave', endDrag);
+
+    document.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (el && el.dataset && el.dataset.type === 'data') {
+        applyDragToCell(el);
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', endDrag);
+    document.addEventListener('touchcancel', endDrag);
+
+    function clearColours() {
+      const table = document.querySelector('#tableContainer table');
+      if (!table) return;
+      const dataCells = table.querySelectorAll('td[data-type="data"]');
+      dataCells.forEach(td => applyColorToCell(td, '#ffffff'));
+      if (currentWidth && currentHeight) saveDesign(currentWidth, currentHeight);
+    }
+
+    function clearSelection() {
+      applyRowSelectionByRowNumber(null, currentHeight);
+      applyColumnSelectionByColNumber(null, currentWidth, currentHeight);
+      if (currentWidth && currentHeight) saveDesign(currentWidth, currentHeight);
+    }
+
+    function toggleLock() {
+      isLocked = !isLocked;
+      updateLockUI();
+      if (currentWidth && currentHeight) saveDesign(currentWidth, currentHeight);
+    }
+
+    function updateLockUI() {
+      const btn = document.getElementById('lockToggle');
+      if (!btn) return;
+      btn.textContent = isLocked ? 'Unlock Editing' : 'Lock Editing';
+      btn.classList.toggle('locked', isLocked);
+    }
+
+    function initPalette() {
+      const paletteDiv = document.getElementById('palette');
+      paletteDiv.innerHTML = '';
+      PALETTE.forEach(color => {
+        const sw = document.createElement('div');
+        sw.className = 'palette-swatch';
+        sw.style.backgroundColor = color;
+        sw.dataset.color = color;
+        sw.addEventListener('click', () => {
+          currentColor = color;
+          updatePaletteSelection(color);
+          if (currentWidth && currentHeight) saveDesign(currentWidth, currentHeight);
+        });
+        paletteDiv.appendChild(sw);
+      });
+      updatePaletteSelection(currentColor);
+    }
+
+    function updatePaletteSelection(color) {
+      const swatches = document.querySelectorAll('.palette-swatch');
+      swatches.forEach(sw => {
+        if (sw.dataset.color === color) {
+          sw.classList.add('selected');
+        } else {
+          sw.classList.remove('selected');
+        }
+      });
+    }
+
+    function downloadPattern() {
+      if (!currentWidth || !currentHeight) {
+        alert('Generate a grid first.');
+        return;
+      }
+      const design = buildDesignObject(currentWidth, currentHeight);
+      const blob = new Blob([JSON.stringify(design, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `knit-pattern-${design.width}x${design.height}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function handleUpload(files) {
+      if (!files || !files[0]) return;
+      const file = files[0];
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const design = JSON.parse(e.target.result);
+          if (!design.width || !design.height) {
+            alert('Invalid pattern file (missing width/height).');
+            return;
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(design));
+          document.getElementById('widthInput').value = design.width;
+          document.getElementById('heightInput').value = design.height;
+          currentColor = design.currentColor || currentColor;
+          generateTable();
+        } catch (err) {
+          alert('Could not read pattern file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
     window.addEventListener('load', () => {
+      initPalette();
+
+      const notesEl = document.getElementById('patternNotes');
+      notesEl.addEventListener('input', () => {
+        if (currentWidth && currentHeight) {
+          saveDesign(currentWidth, currentHeight);
+        }
+      });
+
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
@@ -304,10 +639,11 @@
           if (design && design.width && design.height) {
             document.getElementById('widthInput').value = design.width;
             document.getElementById('heightInput').value = design.height;
+            if (typeof design.currentColor === 'string') {
+              currentColor = design.currentColor;
+            }
           }
-        } catch (e) {
-          // ignore parse errors
-        }
+        } catch (e) {}
       }
       generateTable();
     });
