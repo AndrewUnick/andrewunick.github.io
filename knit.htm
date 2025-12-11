@@ -32,8 +32,16 @@
       margin-right: 4px;
       margin-top: 4px;
     }
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
 
-    #lockToggle.locked {
+    #lockColourToggle.locked {
+      background-color: #eee;
+      border: 1px solid #999;
+    }
+    #lockWhiteToggle.locked {
       background-color: #eee;
       border: 1px solid #999;
     }
@@ -159,13 +167,21 @@
 
     <button type="button" onclick="generateTable()">Generate Table</button>
     <button type="button" onclick="clearColours()">Clear pattern</button>
+    <button type="button" id="undoButton" onclick="undoLastChange()" disabled>Undo last change</button>
     <button type="button" onclick="clearSelection()">Clear ruler</button>
-    <button type="button" id="lockToggle" onclick="toggleLock()">Lock Editing</button>
+    <button type="button" id="lockColourToggle" onclick="toggleColourLock()">Lock Colours</button>
+    <button type="button" id="lockWhiteToggle" onclick="toggleWhiteLock()">Lock White Squares</button>
   </div>
 
   <div class="palette-wrapper">
     <span class="palette-label">Colour:</span>
     <div class="palette" id="palette"></div>
+    <button type="button" id="editColourButton" onclick="openColorEditor()">Edit colour</button>
+    <input
+      type="color"
+      id="colourPicker"
+      style="display:none; width:24px; height:24px; border:none; padding:0; margin:0;"
+    />
     <span class="small-label">(click swatch, then click or drag over cells)</span>
   </div>
 
@@ -192,16 +208,56 @@
       '#808080', '#00ced1', '#8a2be2', '#006400'
     ];
 
+    // Mutable, persisted palette
+    let currentPalette = PALETTE.slice();
+
     let currentWidth = null;
     let currentHeight = null;
     let currentSelectedRowNumber = null; // bottom-based
     let currentSelectedColNumber = null; // right-based
-    let isLocked = false;
+    let isColourLocked = false;
+    let isWhiteLocked = false;
     let currentColor = '#000000';
 
     let isDragging = false;
-    let dragMode = null; // 'paint' or 'erase'
     let lastDragCellKey = null;
+
+    let historyStack = [];
+
+    function updateUndoUI() {
+      const btn = document.getElementById('undoButton');
+      if (!btn) return;
+      btn.disabled = historyStack.length === 0;
+    }
+
+    function pushHistoryIfPossible() {
+      if (!currentWidth || !currentHeight) return;
+      const design = buildDesignObject(currentWidth, currentHeight);
+      // Deep clone to avoid later mutations
+      const clone = JSON.parse(JSON.stringify(design));
+      historyStack.push(clone);
+      updateUndoUI();
+    }
+
+    function undoLastChange() {
+      if (!currentWidth || !currentHeight) return;
+      if (historyStack.length === 0) return;
+      const previous = historyStack.pop();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(previous));
+      document.getElementById('widthInput').value = previous.width;
+      document.getElementById('heightInput').value = previous.height;
+      currentWidth = previous.width;
+      currentHeight = previous.height;
+      currentColor = previous.currentColor || currentColor;
+      if (Array.isArray(previous.palette)) {
+        currentPalette = previous.palette.slice();
+      } else {
+        currentPalette = PALETTE.slice();
+      }
+      initPalette();
+      generateTable();
+      updateUndoUI();
+    }
 
     function applyColorToCell(td, color) {
       td.dataset.color = color;
@@ -235,9 +291,11 @@
         coloredCells,
         selectedRowNumber: currentSelectedRowNumber,
         selectedColNumber: currentSelectedColNumber,
-        isLocked,
+        isColourLocked,
+        isWhiteLocked,
         notes,
-        currentColor
+        currentColor,
+        palette: currentPalette
       };
     }
 
@@ -310,8 +368,14 @@
         document.getElementById('patternNotes').value = design.notes;
       }
 
-      if (typeof design.isLocked === 'boolean') {
-        isLocked = design.isLocked;
+      if (typeof design.isColourLocked === 'boolean') {
+        isColourLocked = design.isColourLocked;
+      } else if (typeof design.isLocked === 'boolean') {
+        // Backwards compatibility with older saves that used a global lock
+        isColourLocked = design.isLocked;
+      }
+      if (typeof design.isWhiteLocked === 'boolean') {
+        isWhiteLocked = design.isWhiteLocked;
       }
 
       if (typeof design.currentColor === 'string') {
@@ -341,7 +405,13 @@
         applyColumnSelectionByColNumber(design.selectedColNumber, width, height);
       }
 
-      updateLockUI();
+      if (Array.isArray(design.palette)) {
+        currentPalette = design.palette.slice();
+        initPalette();
+      }
+
+      updateColourLockUI();
+      updateWhiteLockUI();
       updatePaletteSelection(currentColor);
     }
 
@@ -352,6 +422,10 @@
       if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
         alert('Please enter positive integers for width and height.');
         return;
+      }
+
+      if (currentWidth && currentHeight) {
+        pushHistoryIfPossible();
       }
 
       currentWidth = width;
@@ -475,35 +549,39 @@
     }
 
     function startDragOnCell(td) {
-      if (isLocked || td.dataset.type !== 'data') return;
+      if (td.dataset.type !== 'data') return;
+      pushHistoryIfPossible();
       isDragging = true;
       lastDragCellKey = null;
-
-      const current = td.dataset.color || '#ffffff';
-      dragMode = (current === '#ffffff' || current.toLowerCase() === 'white')
-        ? 'paint'
-        : 'erase';
-
       applyDragToCell(td);
     }
 
     function applyDragToCell(td) {
-      if (!isDragging || isLocked || !td || td.dataset.type !== 'data') return;
+      if (!isDragging || !td || td.dataset.type !== 'data') return;
       const key = td.dataset.row + ':' + td.dataset.col;
       if (key === lastDragCellKey) return;
       lastDragCellKey = key;
 
-      if (dragMode === 'paint') {
-        applyColorToCell(td, currentColor);
-      } else if (dragMode === 'erase') {
-        applyColorToCell(td, '#ffffff');
+      const current = td.dataset.color || '#ffffff';
+      const isWhite = (current === '#ffffff' || current.toLowerCase() === 'white');
+
+      // White cells obey white-lock only
+      if (isWhite && isWhiteLocked) {
+        return;
       }
+
+      // Coloured cells obey colour-lock only
+      if (!isWhite && isColourLocked) {
+        return;
+      }
+
+      // Always apply the currently selected palette colour
+      applyColorToCell(td, currentColor);
     }
 
     function endDrag() {
       if (!isDragging) return;
       isDragging = false;
-      dragMode = null;
       lastDragCellKey = null;
       if (currentWidth && currentHeight) {
         saveDesign(currentWidth, currentHeight);
@@ -529,34 +607,63 @@
     function clearColours() {
       const table = document.querySelector('#tableContainer table');
       if (!table) return;
+      if (!confirm('Clear the entire pattern?')) return;
+      pushHistoryIfPossible();
       const dataCells = table.querySelectorAll('td[data-type="data"]');
       dataCells.forEach(td => applyColorToCell(td, '#ffffff'));
       if (currentWidth && currentHeight) saveDesign(currentWidth, currentHeight);
     }
 
     function clearSelection() {
+      if (!currentWidth || !currentHeight) return;
+      pushHistoryIfPossible();
       applyRowSelectionByRowNumber(null, currentHeight);
       applyColumnSelectionByColNumber(null, currentWidth, currentHeight);
-      if (currentWidth && currentHeight) saveDesign(currentWidth, currentHeight);
+      saveDesign(currentWidth, currentHeight);
     }
 
-    function toggleLock() {
-      isLocked = !isLocked;
-      updateLockUI();
-      if (currentWidth && currentHeight) saveDesign(currentWidth, currentHeight);
+    function toggleColourLock() {
+      if (!currentWidth || !currentHeight) {
+        isColourLocked = !isColourLocked;
+        updateColourLockUI();
+        return;
+      }
+      pushHistoryIfPossible();
+      isColourLocked = !isColourLocked;
+      updateColourLockUI();
+      saveDesign(currentWidth, currentHeight);
     }
 
-    function updateLockUI() {
-      const btn = document.getElementById('lockToggle');
+    function updateColourLockUI() {
+      const btn = document.getElementById('lockColourToggle');
       if (!btn) return;
-      btn.textContent = isLocked ? 'Unlock Editing' : 'Lock Editing';
-      btn.classList.toggle('locked', isLocked);
+      btn.textContent = isColourLocked ? 'Unlock Colours' : 'Lock Colours';
+      btn.classList.toggle('locked', isColourLocked);
+    }
+
+    function updateWhiteLockUI() {
+      const btn = document.getElementById('lockWhiteToggle');
+      if (!btn) return;
+      btn.textContent = isWhiteLocked ? 'Unlock White Squares' : 'Lock White Squares';
+      btn.classList.toggle('locked', isWhiteLocked);
+    }
+
+    function toggleWhiteLock() {
+      if (!currentWidth || !currentHeight) {
+        isWhiteLocked = !isWhiteLocked;
+        updateWhiteLockUI();
+        return;
+      }
+      pushHistoryIfPossible();
+      isWhiteLocked = !isWhiteLocked;
+      updateWhiteLockUI();
+      saveDesign(currentWidth, currentHeight);
     }
 
     function initPalette() {
       const paletteDiv = document.getElementById('palette');
       paletteDiv.innerHTML = '';
-      PALETTE.forEach(color => {
+      currentPalette.forEach(color => {
         const sw = document.createElement('div');
         sw.className = 'palette-swatch';
         sw.style.backgroundColor = color;
@@ -580,6 +687,73 @@
           sw.classList.remove('selected');
         }
       });
+    }
+
+    function openColorEditor() {
+      // Do not allow editing of white
+      if (currentColor === '#ffffff' || currentColor.toLowerCase() === 'white') {
+        alert('White cannot be edited. Please select a different colour first.');
+        return;
+      }
+      const picker = document.getElementById('colourPicker');
+      if (!picker) return;
+      // Initialise picker with the current colour (fallback to black if invalid)
+      try {
+        picker.value = currentColor && /^#([0-9a-fA-F]{6})$/.test(currentColor)
+          ? currentColor
+          : '#000000';
+      } catch (e) {
+        picker.value = '#000000';
+      }
+      // Show the colour input so the user can click it (Safari-friendly)
+      picker.style.display = 'inline-block';
+      picker.focus();
+    }
+
+    function handleColourPickerChange(event) {
+      const newColor = event.target.value;
+      if (!newColor) return;
+
+      // Update the currently selected swatch to use the new colour
+      const swatches = document.querySelectorAll('.palette-swatch');
+      swatches.forEach((sw, index) => {
+        if (sw.classList.contains('selected')) {
+          sw.dataset.color = newColor;
+          sw.style.backgroundColor = newColor;
+          if (Array.isArray(currentPalette) && index < currentPalette.length) {
+            currentPalette[index] = newColor;
+          }
+        }
+      });
+
+      // Update current colour and selection highlight
+      currentColor = newColor;
+      updatePaletteSelection(newColor);
+
+      // Persist the fact we've changed the currently selected colour
+      if (currentWidth && currentHeight) {
+        saveDesign(currentWidth, currentHeight);
+      } else {
+        // Also persist palette for next session even before a grid exists
+        const scratchDesign = {
+          width: parseInt(document.getElementById('widthInput').value, 10) || 20,
+          height: parseInt(document.getElementById('heightInput').value, 10) || 20,
+          coloredCells: [],
+          selectedRowNumber: null,
+          selectedColNumber: null,
+          isColourLocked,
+          isWhiteLocked,
+          notes: document.getElementById('patternNotes').value || '',
+          currentColor,
+          palette: currentPalette
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(scratchDesign));
+      }
+      // Hide the colour picker again after selection
+      const picker = document.getElementById('colourPicker');
+      if (picker) {
+        picker.style.display = 'none';
+      }
     }
 
     function downloadPattern() {
@@ -610,10 +784,19 @@
             alert('Invalid pattern file (missing width/height).');
             return;
           }
+          if (currentWidth && currentHeight) {
+            pushHistoryIfPossible();
+          }
+          if (Array.isArray(design.palette)) {
+            currentPalette = design.palette.slice();
+          } else {
+            currentPalette = PALETTE.slice();
+          }
           localStorage.setItem(STORAGE_KEY, JSON.stringify(design));
           document.getElementById('widthInput').value = design.width;
           document.getElementById('heightInput').value = design.height;
           currentColor = design.currentColor || currentColor;
+          initPalette();
           generateTable();
         } catch (err) {
           alert('Could not read pattern file.');
@@ -623,15 +806,6 @@
     }
 
     window.addEventListener('load', () => {
-      initPalette();
-
-      const notesEl = document.getElementById('patternNotes');
-      notesEl.addEventListener('input', () => {
-        if (currentWidth && currentHeight) {
-          saveDesign(currentWidth, currentHeight);
-        }
-      });
-
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
@@ -642,10 +816,38 @@
             if (typeof design.currentColor === 'string') {
               currentColor = design.currentColor;
             }
+            if (Array.isArray(design.palette)) {
+              currentPalette = design.palette.slice();
+            }
+            if (typeof design.isColourLocked === 'boolean') {
+              isColourLocked = design.isColourLocked;
+            } else if (typeof design.isLocked === 'boolean') {
+              isColourLocked = design.isLocked;
+            }
+            if (typeof design.isWhiteLocked === 'boolean') {
+              isWhiteLocked = design.isWhiteLocked;
+            }
           }
         } catch (e) {}
       }
+
+      initPalette();
+
+      const colourPicker = document.getElementById('colourPicker');
+      if (colourPicker) {
+        colourPicker.addEventListener('input', handleColourPickerChange);
+        colourPicker.addEventListener('change', handleColourPickerChange);
+      }
+
+      const notesEl = document.getElementById('patternNotes');
+      notesEl.addEventListener('input', () => {
+        if (currentWidth && currentHeight) {
+          saveDesign(currentWidth, currentHeight);
+        }
+      });
+
       generateTable();
+      updateUndoUI();
     });
   </script>
 </body>
